@@ -24,6 +24,33 @@
 ```bash
  api/v1/seat/available/:showId
  ``` 
- 
 
 
+## Setup Instructions
+
+- Clone the repository
+
+```bash
+  git clone https://github.com/Karan619602/TicketBooking.git
+```
+
+- Change the current working directory
+
+```bash
+  cd TicketBooking
+```
+
+
+- Install the packages
+
+```bash
+  npm i 
+```
+
+- Add .env in TicketBooking Directory and Setup Varibles user_name, password, database_name, host for database
+
+- Run the project
+
+```bash
+  npm start
+```
