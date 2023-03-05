@@ -47,7 +47,7 @@
   npm i 
 ```
 
-- Add .env in TicketBooking Directory and Setup Varibles user_name, password, database_name, host for database
+- Add .env in TicketBooking Directory and Setup Variables database_name,user_name, password and host for Database.
 
 - Run the project
 
