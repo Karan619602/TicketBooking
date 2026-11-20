@@ -1,122 +1,80 @@
-# Online Movie Ticket Booking API
+# Movie Ticket Booking Backend
 
-A REST API for managing users, cinema screens, shows, seats and bookings. It uses Node.js, Express and Sequelize, with SQLite for zero-setup local development and MySQL support for deployments and database-specific concurrency testing.
+A Node.js, Express and Sequelize API for movie-ticket booking, with SQLite for local development and PostgreSQL 16 for production-style integration and concurrency testing.
 
-## Requirements
+## Database setup
 
-- Node.js 18 or later
-- npm
-
-A local MySQL server is not required for the default setup.
-
-## Run locally
-
-1. Install packages:
-
-   ```bash
-   npm ci
-   ```
-
-2. Copy `.env.example` to `.env` if you want to customise the defaults.
-
-3. Start the server:
-
-   ```bash
-   npm start
-   ```
-
-By default, the API uses SQLite and creates `data/ticketbooking.sqlite` automatically. The API listens on port 3000 by default. `GET /health` returns the service health.
-
-### Using MySQL
-
-MySQL remains supported. Set `DB_DIALECT=mysql` and configure `database_name`, `user_name`, `password`, `host` and `DB_PORT` in the environment. Create the database before starting the API.
-
-### Existing database
-
-Back up your database first. If you are upgrading a database created by the original MySQL version, run `migrations/001-booking-reliability.sql` once before starting the updated API. The script adds the new booking and seat fields and indexes while retaining the existing booking rows. Do not run it on a fresh database. Check for duplicate seat numbers within a screen before creating the new unique index.
-
-## API
-
-All endpoints are prefixed with `/api/v1`.
-
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/user/create` | Create a user |
-| POST | `/screen/create` | Create a screen |
-| GET | `/screen/get` | List screens |
-| POST | `/screens/:screenId/seats` | Add seats to a screen |
-| POST | `/show/create/:screenId` | Schedule a show |
-| GET | `/shows` | List shows; accepts `screenId`, `from` and `to` filters |
-| GET | `/shows/:showId` | Get show details |
-| GET | `/seat/available/:showId` | Get seat availability for a show |
-| POST | `/bookings` | Create a booking |
-| GET | `/bookings` | List bookings with pagination and optional status |
-| POST | `/bookings/:bookingId/cancel` | Cancel a booking |
-
-The original booking and show routes are still available for existing clients.
-
-### Create a booking
-
-Send `POST /api/v1/bookings` with:
-
-```json
-{
-  "userId": 12,
-  "showId": 34,
-  "seatId": 56
-}
-```
-
-Include an `Idempotency-Key` header for safe retries:
-
-```
-Idempotency-Key: checkout-7f82d1
-```
-
-A repeated request with the same key and same booking details returns the original booking. Reusing that key for different details returns `409 Conflict`.
-
-### Booking concurrency
-
-A booking is tied to a show and a seat. A seat can be booked for different shows, but it can have only one confirmed booking for a given show.
-
-The booking service locks the show row inside a MySQL transaction before checking availability and creating the booking. This serializes booking attempts for the same show across multiple API processes. The seat row is also locked while the booking is checked. SQLite does not provide equivalent row-level `SELECT ... FOR UPDATE` semantics; the SQLite functional suite therefore verifies booking workflows, not concurrent booking safety. Run the MySQL concurrency test to validate that guarantee.
-
-The database has indexes for show/seat/status lookups, user booking history and show scheduling. A unique idempotency-key index protects retry handling at the database level.
-
-### Cancellation and history
-
-Cancellation changes the booking status to `cancelled` instead of deleting the row. This preserves booking history and makes the seat available again. A cancelled booking can be replaced with a new booking using a new idempotency key.
-
-### Scheduling and seats
-
-A screen cannot have overlapping shows. Show creation locks the screen row while checking for an overlap and inserting the new show. Seat creation also locks the screen row, checks the current seat count against capacity and creates the seats in the same transaction.
-
-## Tests
-
-Run the default functional tests using an in-memory SQLite database:
+### Local SQLite (default)
+Copy `.env.example` to `.env`. The default SQLite database is created automatically.
 
 ```bash
+npm ci
 npm test
+npm start
 ```
 
-These tests do not require a local MySQL server and are not skipped.
+### PostgreSQL 16
+Start the included PostgreSQL 16 service with `docker compose up -d postgres` (or install PostgreSQL 16 locally), then set:
 
-Run the MySQL-specific concurrency test only against a dedicated test database:
+```env
+DB_DIALECT=postgres
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_NAME=ticketbooking
+DB_USER=postgres
+DB_PASSWORD=postgres # docker-compose default; change for local installations
+```
+
+Install PostgreSQL 16 and ensure the server is running before executing:
 
 ```bash
-DB_DIALECT=mysql RUN_DB_TESTS=true npm run test:mysql
+npm ci
+npm run test:postgres
+npm start
 ```
 
-On Windows Command Prompt:
+The PostgreSQL concurrency test is `test/postgres.concurrency.test.js` and can be run alone with `npm run test:postgres:concurrency`. It verifies concurrent booking contention and FIFO waitlist promotion against PostgreSQL row locks.
 
-```cmd
-set DB_DIALECT=mysql&& set RUN_DB_TESTS=true&& npm run test:mysql
+## Waitlist API
+
+- `POST /api/v1/shows/:showId/waitlist` with JSON `{ "userId": 123 }` — join a sold-out show's FIFO waitlist.
+- `GET /api/v1/shows/:showId/waitlist` — list waitlist entries (optional `?userId=123` filter).
+- `DELETE /api/v1/waitlist/:waitlistId` with JSON `{ "userId": 123 }` — leave an active waitlist.
+
+When a confirmed booking is cancelled, the service promotes the oldest eligible waitlist entry and creates the replacement booking inside the same database transaction. The released seat is not exposed between cancellation and promotion.
+
+
+## Authenticated checkout workflow
+
+New accounts can use the credential-backed authentication endpoints. Passwords are derived with Node.js scrypt and access tokens are signed with HMAC-SHA256. Set `AUTH_TOKEN_SECRET` to a random value of at least 32 characters in production.
+
+- `POST /api/v1/auth/register` — JSON `{ "name": "A User", "email": "a@example.com", "password": "at-least-12-characters" }`.
+- `POST /api/v1/auth/login` — JSON `{ "email": "a@example.com", "password": "..." }`; returns a Bearer token.
+- `POST /api/v1/shows/:showId/holds` — Bearer token + JSON `{ "seatId": 123 }`; creates a short-lived hold (default 5 minutes, configurable from 1 to 15 with `SEAT_HOLD_MINUTES`).
+- `GET /api/v1/holds/:holdId` and `DELETE /api/v1/holds/:holdId` — inspect or release the caller's hold.
+- `POST /api/v1/payment-intents` — Bearer token + JSON `{ "holdId": 123 }`; optional `Idempotency-Key` header.
+- `POST /api/v1/payment-intents/:paymentId/confirm` — runs the local payment simulator and atomically creates a booking on success.
+- `POST /api/v1/payment-intents/:paymentId/refund` — refunds a successful simulated payment, cancels its booking and invokes FIFO waitlist promotion in one transaction.
+
+The payment adapter is deliberately a development simulator, not a real payment gateway. It never accepts card data. Set `PAYMENT_SIMULATOR_OUTCOME=decline` to exercise the failure path. A successful confirmation is idempotent; repeating it returns the existing booking. A failed payment releases the hold. Expiration is checked synchronously on hold/payment operations and a background worker periodically marks stale holds expired.
+
+## Production workflow schema and migration
+
+Sequelize creates the application tables for a fresh database. After initialization on PostgreSQL, apply the optional query-index migration with:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/001-production-workflows.sql
 ```
 
-Do not run integration tests against production data. GitHub Actions runs both the SQLite functional test and the MySQL concurrency test using a MySQL 8 service.
+The migration adds targeted indexes for hold expiry, FIFO waitlist retrieval, payment history and confirmed-seat lookups. Back up existing databases before applying schema changes. The project uses a modular monolith; the background expiration worker runs in-process and can be moved to a dedicated worker deployment when multiple application replicas are introduced.
 
-## Current scope
+## Environment variables
 
-Payment gateway integration is intentionally not included yet. Booking and cancellation are implemented independently so payment can be added later without mixing gateway calls into the seat-allocation transaction.
+- `AUTH_TOKEN_SECRET`: production signing secret (32+ characters).
+- `SEAT_HOLD_MINUTES`: temporary hold duration (1–15 minutes; default 5).
+- `PAYMENT_SIMULATOR_OUTCOME`: `success` or `decline` for local testing.
+- `DB_LOGGING`: set to `false` to suppress SQL logs in development.
 
-The current API retains the original userId-based routes and does not yet authenticate callers. A user ID supplied by the request is not proof of identity. Add authentication and authorization before exposing booking management endpoints publicly.
+### Authentication and legacy routes
+
+The modern `/api/v1/bookings` create/list/cancel endpoints require a Bearer token. Customer booking lists are automatically scoped to the authenticated user. Configure `ADMIN_EMAILS` as a comma-separated allowlist before registration to provision trusted administrator accounts; do not expose this configuration to untrusted users. Legacy `/api/v1/booking/*` routes remain for backward compatibility and accept caller-supplied user IDs; disable them at the reverse proxy or remove them before exposing the service publicly.
