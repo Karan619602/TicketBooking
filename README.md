@@ -8,7 +8,7 @@ A Node.js, Express and Sequelize API for movie-ticket booking, with SQLite for l
 Copy `.env.example` to `.env`. The default SQLite database is created automatically.
 
 ```bash
-npm install
+npm ci
 npm test
 npm start
 ```
@@ -28,7 +28,7 @@ DB_PASSWORD=your_password
 Install PostgreSQL 16 and ensure the server is running before executing:
 
 ```bash
-npm install
+npm ci
 npm run test:postgres
 npm start
 ```
