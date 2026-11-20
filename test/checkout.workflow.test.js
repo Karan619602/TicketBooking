@@ -82,6 +82,16 @@ test('authenticated checkout holds seats, confirms idempotently and refunds atom
     const released = await holdService.releaseHold({ holdId: releasable.hold.id, userId: registered.user.id });
     assert.equal(released.status, 'released');
 
+    const retryHold = await holdService.createHold({ userId: registered.user.id, showId: show.id, seatId: seat1.id });
+    const retryIntent = await paymentService.createIntent({ userId: registered.user.id, holdId: retryHold.hold.id });
+    const previousOutcome = process.env.PAYMENT_SIMULATOR_OUTCOME;
+    process.env.PAYMENT_SIMULATOR_OUTCOME = 'decline';
+    const declined = await paymentService.confirmPayment({ userId: registered.user.id, paymentId: retryIntent.payment.id });
+    if (previousOutcome === undefined) delete process.env.PAYMENT_SIMULATOR_OUTCOME;
+    else process.env.PAYMENT_SIMULATOR_OUTCOME = previousOutcome;
+    assert.equal(declined.payment.status, 'failed');
+    assert.equal((await SeatHold.findByPk(retryHold.hold.id)).status, 'released');
+
     const expiring = await holdService.createHold({ userId: registered.user.id, showId: show.id, seatId: seat2.id });
     expiring.hold.expiresAt = new Date(Date.now() - 1000);
     await expiring.hold.save();
@@ -92,7 +102,7 @@ test('authenticated checkout holds seats, confirms idempotently and refunds atom
       (error) => error.status === 409
     );
 
-    assert.equal(await Payment.count({ where: { userId: registered.user.id } }), 1);
+    assert.equal(await Payment.count({ where: { userId: registered.user.id } }), 2);
     assert.equal(await SeatHold.count({ where: { userId: registered.user.id, status: 'confirmed' } }), 1);
   } finally {
     if (show) {
