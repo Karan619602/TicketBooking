@@ -27,6 +27,10 @@ A REST API for managing users, cinema screens, shows, seats and bookings. It use
 
 The API listens on port 3000 by default. `GET /health` returns the service health.
 
+### Existing database
+
+Back up your database first. If you are upgrading a database created by the original version, run `migrations/001-booking-reliability.sql` once before starting the updated API. The script adds the new booking and seat fields and indexes while retaining the existing booking rows. Do not run it on a fresh database. Check for duplicate seat numbers within a screen before creating the new unique index.
+
 ## API
 
 All endpoints are prefixed with `/api/v1`.
@@ -79,24 +83,24 @@ The database has indexes for show/seat/status lookups, user booking history and 
 
 Cancellation changes the booking status to `cancelled` instead of deleting the row. This preserves booking history and makes the seat available again. A cancelled booking can be replaced with a new booking using a new idempotency key.
 
-### Scheduling
+### Scheduling and seats
 
-A screen cannot have overlapping shows. Show creation locks the screen row while checking for an overlap and inserting the new show.
+A screen cannot have overlapping shows. Show creation locks the screen row while checking for an overlap and inserting the new show. Seat creation also locks the screen row, checks the current seat count against capacity and creates the seats in the same transaction.
 
 ## Tests
 
-Run the regular test suite:
+Run the test suite:
 
 ```bash
 npm test
 ```
 
-The MySQL integration test is opt-in. Use a dedicated test database, configure the same database variables in `.env`, set `RUN_DB_TESTS=true`, and run `npm test`. The test creates and removes its own records; do not point it at production data.
+The MySQL integration test is opt-in locally. Use a dedicated test database, configure the database variables in `.env`, set `RUN_DB_TESTS=true`, and run `npm test`. The test creates and removes its own records; do not point it at production data.
 
-The integration test covers simultaneous booking attempts, idempotent retries, reusing a seat for a different show, cancellation, and booking the released seat again.
+GitHub Actions starts a MySQL 8 service and runs the integration test on pushes and pull requests. It covers simultaneous booking attempts, idempotent retries, reusing a seat for another show, cancellation and booking the released seat again.
 
 ## Current scope
 
 Payment gateway integration is intentionally not included yet. Booking and cancellation are implemented independently so payment can be added later without mixing gateway calls into the seat-allocation transaction.
 
-Authentication and authorization also need to be added before exposing user-specific booking operations or the booking-list endpoint to the public internet. The current API accepts `userId` from the request for compatibility with the original project; it is not a verified identity.
+The current API retains the original userId-based routes and does not yet authenticate callers. A user ID supplied by the request is not proof of identity. Add authentication and authorization before exposing booking management endpoints publicly.
