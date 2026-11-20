@@ -4,7 +4,7 @@ const HttpError = require('../utils/httpError');
 
 const CreateBooking = async (req, res, next) => {
   try {
-    const userId = Number(req.body.userId || req.params.userId);
+    const userId = req.auth ? req.auth.userId : Number(req.body.userId || req.params.userId);
     const showId = Number(req.body.showId || req.params.showId);
     const seatId = Number(req.body.seatId || req.params.seatId);
     const idempotencyKey = req.get('Idempotency-Key');
@@ -25,6 +25,7 @@ const CreateBooking = async (req, res, next) => {
 const GetAllBookings = async (req, res, next) => {
   try {
     const where = {};
+    if (req.auth && req.auth.role !== 'admin') where.userId = req.auth.userId;
     if (req.query.status) {
       if (!['confirmed', 'cancelled'].includes(req.query.status)) throw new HttpError(400, 'status must be confirmed or cancelled');
       where.status = req.query.status;
@@ -48,7 +49,7 @@ const CancelSeatBooking = async (req, res, next) => {
   try {
     const bookingId = Number(req.params.bookingId || req.params.BookingId);
     if (!Number.isInteger(bookingId) || bookingId < 1) throw new HttpError(400, 'A valid booking ID is required');
-    const result = await bookingService.cancelBooking({ bookingId, userId: req.body.userId || req.query.userId });
+    const result = await bookingService.cancelBooking({ bookingId, userId: req.auth ? req.auth.userId : (req.body.userId || req.query.userId) });
     res.status(200).json({
       message: result.promotion ? 'Booking cancelled and next waitlisted customer promoted' : 'Booking cancelled successfully',
       booking: { id: result.booking.id, bookingReference: result.booking.bookingReference, status: result.booking.status },

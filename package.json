@@ -1,19 +1,18 @@
 {
   "name": "ticketbooking",
   "version": "1.2.0",
-  "description": "Online movie ticket booking API",
+  "description": "Transactional movie ticket booking backend with holds, waitlists and payment lifecycle",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "node scripts/run-tests.js sqlite",
+    "test": "npm run test:local",
     "test:local": "node scripts/run-tests.js sqlite",
     "test:postgres": "node scripts/run-tests.js postgres",
-    "test:postgres:concurrency": "node --test test/postgres.concurrency.test.js"
+    "test:postgres:concurrency": "node --test test/postgres.concurrency.test.js test/postgres.checkout.concurrency.test.js",
+    "db:expire-holds": "node scripts/expire-holds.js"
   },
-  "engines": {
-    "node": ">=18"
-  },
+  "engines": { "node": ">=18" },
   "dependencies": {
     "body-parser": "^1.20.2",
     "dotenv": "^16.0.3",

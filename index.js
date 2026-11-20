@@ -14,6 +14,10 @@ const showsrouter = require('./routers/showsrouter');
 const seatrouter = require('./routers/seatrouter');
 const bookingrouter = require('./routers/bookingrouter');
 const waitlistrouter = require('./routers/waitlistrouter');
+const authrouter = require('./routers/authrouter');
+const holdrouter = require('./routers/holdrouter');
+const paymentrouter = require('./routers/paymentrouter');
+const { startMaintenanceWorker } = require('./services/maintenanceworker');
 
 app.get('/health', (req, res) => res.status(200).json({ status: 'ok' }));
 app.use('/api/v1', screenrouter);
@@ -22,6 +26,9 @@ app.use('/api/v1', showsrouter);
 app.use('/api/v1', seatrouter);
 app.use('/api/v1', bookingrouter);
 app.use('/api/v1', waitlistrouter);
+app.use('/api/v1', authrouter);
+app.use('/api/v1', holdrouter);
+app.use('/api/v1', paymentrouter);
 
 app.use((req, res) => res.status(404).json({ message: 'Route not found' }));
 app.use((err, req, res, next) => {
@@ -45,6 +52,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 if (require.main === module) {
   initializeDatabase().then(() => {
+    startMaintenanceWorker();
     app.listen(PORT, () => console.log('Server is running on port ' + PORT));
   }).catch((err) => {
     console.error('Could not connect to the database:', err);

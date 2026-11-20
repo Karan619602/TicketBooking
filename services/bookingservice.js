@@ -1,5 +1,6 @@
 const crypto = require('node:crypto');
-const { sequelize, User, Show, Seat, Booking } = require('../models');
+const { Op } = require('sequelize');
+const { sequelize, User, Show, Seat, Booking, SeatHold } = require('../models');
 const HttpError = require('../utils/httpError');
 const waitlistService = require('./waitlistservice');
 
@@ -45,6 +46,15 @@ async function createBooking({ userId, showId, seatId, idempotencyKey }) {
 
       const existingBooking = await Booking.findOne({ where: { showId, seatId, status: 'confirmed' }, transaction });
       if (existingBooking) throw new HttpError(409, 'This seat is already booked for the selected show');
+
+      const now = new Date();
+      await SeatHold.update({ status: 'expired' }, {
+        where: { showId, seatId, status: 'active', expiresAt: { [Op.lte]: now } }, transaction
+      });
+      const activeHold = await SeatHold.findOne({
+        where: { showId, seatId, status: 'active', expiresAt: { [Op.gt]: now } }, transaction
+      });
+      if (activeHold) throw new HttpError(409, 'This seat is temporarily held; complete checkout or wait for the hold to expire');
 
       const booking = await Booking.create({
         userId, showId, seatId, status: 'confirmed', totalAmount: seat.price,

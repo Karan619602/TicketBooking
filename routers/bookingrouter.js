@@ -1,12 +1,14 @@
 const express = require('express');
 const router = express.Router();
+const { authenticate } = require('../middleware/authenticate');
 const { CreateBooking, GetAllBookings, CancelSeatBooking } = require('../controllers/bookingcontroller');
 
-router.post('/bookings', CreateBooking);
-router.get('/bookings', GetAllBookings);
-router.post('/bookings/:bookingId/cancel', CancelSeatBooking);
+// Authenticated API: user identity is derived from the verified token.
+router.post('/bookings', authenticate, CreateBooking);
+router.get('/bookings', authenticate, GetAllBookings);
+router.post('/bookings/:bookingId/cancel', authenticate, CancelSeatBooking);
 
-// Keep the original routes working for existing clients.
+// Legacy compatibility routes. Keep disabled at the edge before public deployment.
 router.post('/booking/create/:userId/:showId/:seatId', CreateBooking);
 router.post('/booking/cancel/:BookingId', CancelSeatBooking);
 
