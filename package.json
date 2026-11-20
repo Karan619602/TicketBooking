@@ -6,8 +6,10 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "node --test test/booking.integration.test.js",
-    "test:mysql": "node --test test/booking.mysql.integration.js"
+    "test": "node scripts/run-tests.js sqlite",
+    "test:local": "node scripts/run-tests.js sqlite",
+    "test:postgres": "node scripts/run-tests.js postgres",
+    "test:postgres:concurrency": "node --test test/postgres.concurrency.test.js"
   },
   "engines": {
     "node": ">=18"
@@ -19,6 +21,7 @@
     "mysql": "^2.18.1",
     "mysql2": "^3.2.0",
     "nodemon": "^2.0.21",
+    "pg": "^8.13.1",
     "sequelize": "^6.29.0",
     "sqlite3": "^5.1.7"
   },
