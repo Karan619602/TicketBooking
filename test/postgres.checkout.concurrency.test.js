@@ -5,6 +5,7 @@ require('dotenv').config();
 test('PostgreSQL serializes competing seat holds and atomically confirms one payment', {
   skip: !['postgres', 'postgresql'].includes((process.env.DB_DIALECT || '').toLowerCase()) && 'Requires PostgreSQL 16'
 }, async () => {
+  const { Op } = require('sequelize');
   const { initializeDatabase, sequelize, User, Screen, Show, Seat, Booking, Waitlist, SeatHold, Payment } = require('../models');
   const holdService = require('../services/seatholdservice');
   const paymentService = require('../services/paymentservice');
@@ -44,7 +45,8 @@ test('PostgreSQL serializes competing seat holds and atomically confirms one pay
     );
   } finally {
     if (show) {
-      await Payment.destroy({ where: { holdId: { [require('sequelize').Op.in]: (await SeatHold.findAll({ where: { showId: show.id }, attributes: ['id'] })).map((hold) => hold.id) } } });
+      const holds = await SeatHold.findAll({ where: { showId: show.id }, attributes: ['id'] });
+      await Payment.destroy({ where: { holdId: { [Op.in]: holds.map((hold) => hold.id) } } });
       await SeatHold.destroy({ where: { showId: show.id } });
       await Booking.destroy({ where: { showId: show.id } });
       await Waitlist.destroy({ where: { showId: show.id } });
