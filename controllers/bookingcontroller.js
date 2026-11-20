@@ -1,93 +1,97 @@
-const {Seat,Booking,Show} = require('../models/index')
+const { Booking, Show, Seat, User } = require('../models');
+const bookingService = require('../services/bookingservice');
+const HttpError = require('../utils/httpError');
 
+const CreateBooking = async (req, res, next) => {
+  try {
+    const userId = Number(req.body.userId || req.params.userId);
+    const showId = Number(req.body.showId || req.params.showId);
+    const seatId = Number(req.body.seatId || req.params.seatId);
+    const idempotencyKey = req.get('Idempotency-Key');
 
-const CreateBooking= (async (req, res) => {
-    const { showId, seatId,userId } = req.params;
-  
-    // find the screen in which show is available
-    const show = await Show.findByPk(showId);
-    // check if the seat is available
-    
-    const seat = await Seat.findOne({
-      where: {
-        id:seatId,
-        screenId: show.screenId,
+    if (![userId, showId, seatId].every((value) => Number.isInteger(value) && value > 0)) {
+      throw new HttpError(400, 'Valid userId, showId and seatId are required');
+    }
+    if (idempotencyKey && (idempotencyKey.length > 128 || !/^[\w.:\-]+$/.test(idempotencyKey))) {
+      throw new HttpError(400, 'Idempotency-Key must be at most 128 letters, numbers, dots, underscores, colons or hyphens');
+    }
+
+    const result = await bookingService.createBooking({ userId, showId, seatId, idempotencyKey });
+    const booking = result.booking;
+    res.status(result.replayed ? 200 : 201).json({
+      message: result.replayed ? 'Existing booking returned' : 'Seat booked successfully',
+      replayed: result.replayed,
+      booking: {
+        id: booking.id,
+        bookingReference: booking.bookingReference,
+        userId: booking.userId,
+        showId: booking.showId,
+        seatId: booking.seatId,
+        status: booking.status,
+        totalAmount: booking.totalAmount,
+        createdAt: booking.createdAt
       }
     });
-  
-    if (seat.available) {
-      // reserve the seat
-      seat.available = false;
-      seat.userId=userId;
-      await seat.save();
-  
-      // create a new booking
-      const booking = await Booking.create({
-        showId: showId,
-        seatId: seatId,
-        userId: userId
-      });
-  
-      res.status(200).json({
-        message: 'Seat reserved successfully',
-        bookingId: booking.id
-      });
-    } else {
-      // suggest next available seats
-      const nextavailableSeats = await Seat.findAll({
-        where: {
-          showId: showId,
-          screenId: screenId,
-          isavailable: true
-        }
-      });
-  
-      res.status(400).json({
-        message: 'Seat is not available',
-        nextavailableSeats: nextavailableSeats
-      });
-    }
-  });
-  
-  const GetAllBookings = async (req, res) => {
-    try {
-      const bookings = await Booking.findAll();
-      res.status(200).json({
-       bookings
-      });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ message: 'Server error' });
-    }
-  };
+  } catch (error) {
+    next(error);
+  }
+};
 
-  const CancelSeatBooking = async (req, res) => {
-    const { BookingId } = req.params;
-    try {
-      const booking = await Booking.findByPk(BookingId);
-      if (!booking) {
-        return res.status(404).json({ message: 'booking not found' });
+const GetAllBookings = async (req, res, next) => {
+  try {
+    const where = {};
+    if (req.query.status) {
+      if (!['confirmed', 'cancelled'].includes(req.query.status)) {
+        throw new HttpError(400, 'status must be confirmed or cancelled');
       }
-     const seat = await Seat.findOne({
-        where:{
-            id:booking.seatId
-        }
-     })
-      seat.available = true;
-      seat.userId=null;
-      await seat.save();
- 
-      // delete booking from the database
-      booking.destroy({where:{id:BookingId}})
-
-      res.json({ message: 'Seat booking cancelled successfully' });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ message: 'Server error' });
+      where.status = req.query.status;
     }
-  };
-  
 
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+    const result = await Booking.findAndCountAll({
+      where,
+      include: [
+        { model: Show, attributes: ['id', 'name', 'startTime', 'endTime'] },
+        { model: Seat, attributes: ['id', 'number', 'category'] },
+        { model: User, attributes: ['id', 'name', 'email'] }
+      ],
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset: (page - 1) * limit,
+      distinct: true
+    });
 
+    res.status(200).json({
+      bookings: result.rows,
+      pagination: { page, limit, total: result.count, pages: Math.ceil(result.count / limit) }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
-  module.exports= {CreateBooking,GetAllBookings,CancelSeatBooking}
+const CancelSeatBooking = async (req, res, next) => {
+  try {
+    const bookingId = Number(req.params.bookingId || req.params.BookingId);
+    if (!Number.isInteger(bookingId) || bookingId < 1) {
+      throw new HttpError(400, 'A valid booking ID is required');
+    }
+    const booking = await bookingService.cancelBooking({
+      bookingId,
+      userId: req.body.userId || req.query.userId
+    });
+    res.status(200).json({
+      message: 'Booking cancelled successfully',
+      booking: {
+        id: booking.id,
+        bookingReference: booking.bookingReference,
+        status: booking.status
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { CreateBooking, GetAllBookings, CancelSeatBooking };

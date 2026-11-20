@@ -1,11 +1,13 @@
-const express=require('express')
+const express = require('express');
+const router = express.Router();
+const { CreateBooking, GetAllBookings, CancelSeatBooking } = require('../controllers/bookingcontroller');
 
-const router= express.Router()
+router.post('/bookings', CreateBooking);
+router.get('/bookings', GetAllBookings);
+router.post('/bookings/:bookingId/cancel', CancelSeatBooking);
 
-const {CreateBooking,GetAllBookings,CancelSeatBooking} = require('../controllers/bookingcontroller')
+// Keep the original routes working for existing clients.
+router.post('/booking/create/:userId/:showId/:seatId', CreateBooking);
+router.post('/booking/cancel/:BookingId', CancelSeatBooking);
 
-router.post('/booking/create/:userId/:showId/:seatId',CreateBooking)
-router.get('/bookings/',GetAllBookings)
-router.post('/booking/cancel/:BookingId',CancelSeatBooking)
-
-module.exports= router
+module.exports = router;
