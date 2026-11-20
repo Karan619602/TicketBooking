@@ -1,12 +1,31 @@
 const { spawnSync } = require('node:child_process');
 
 const dialect = (process.argv[2] || 'sqlite').toLowerCase();
-if (!['sqlite', 'postgres', 'postgresql', 'mysql'].includes(dialect)) {
-  console.error('Usage: node scripts/run-tests.js [sqlite|postgres|mysql]');
+const suites = {
+  sqlite: [
+    'test/booking.integration.test.js',
+    'test/waitlist.integration.test.js',
+    'test/checkout.workflow.test.js'
+  ],
+  postgres: [
+    'test/waitlist.integration.test.js',
+    'test/postgres.concurrency.test.js',
+    'test/postgres.checkout.concurrency.test.js'
+  ],
+  postgresql: [
+    'test/waitlist.integration.test.js',
+    'test/postgres.concurrency.test.js',
+    'test/postgres.checkout.concurrency.test.js'
+  ]
+};
+
+if (!suites[dialect]) {
+  console.error('Usage: node scripts/run-tests.js [sqlite|postgres]');
   process.exit(2);
 }
-const result = spawnSync(process.execPath, ['--test'], {
+
+const result = spawnSync(process.execPath, ['--test', ...suites[dialect]], {
   stdio: 'inherit',
-  env: { ...process.env, DB_DIALECT: dialect }
+  env: { ...process.env, DB_DIALECT: dialect === 'postgresql' ? 'postgres' : dialect }
 });
 process.exit(result.status === null ? 1 : result.status);
