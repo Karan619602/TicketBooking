@@ -6,12 +6,14 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "node --test test/*.test.js",
-    "test:local": "DB_DIALECT=sqlite node --test test/*.test.js",
-    "test:postgres": "DB_DIALECT=postgres node --test test/*.test.js",
-    "test:postgres:concurrency": "DB_DIALECT=postgres node --test test/postgres.concurrency.test.js"
+    "test": "node scripts/run-tests.js sqlite",
+    "test:local": "node scripts/run-tests.js sqlite",
+    "test:postgres": "node scripts/run-tests.js postgres",
+    "test:postgres:concurrency": "node --test test/postgres.concurrency.test.js"
   },
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "body-parser": "^1.20.2",
     "dotenv": "^16.0.3",
