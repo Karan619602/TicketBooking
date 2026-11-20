@@ -55,6 +55,11 @@ test('authenticated checkout holds seats, confirms idempotently and refunds atom
       holdService.createHold({ userId: secondUser.user.id, showId: show.id, seatId: seat1.id }),
       (error) => error.status === 409
     );
+    const bookingService = require('../services/bookingservice');
+    await assert.rejects(
+      bookingService.createBooking({ userId: secondUser.user.id, showId: show.id, seatId: seat1.id }),
+      (error) => error.status === 409
+    );
 
     const intent = await paymentService.createIntent({
       userId: registered.user.id, holdId: held.hold.id, idempotencyKey: 'checkout-intent-' + Date.now()
