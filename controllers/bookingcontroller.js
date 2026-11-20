@@ -1,93 +1,85 @@
-const {Seat,Booking,Show} = require('../models/index')
+const { sequelize, Seat, Booking, Show } = require('../models');
 
+const CreateBooking = async (req, res, next) => {
+  const { showId, seatId, userId } = req.params;
 
-const CreateBooking= (async (req, res) => {
-    const { showId, seatId,userId } = req.params;
-  
-    // find the screen in which show is available
-    const show = await Show.findByPk(showId);
-    // check if the seat is available
-    
-    const seat = await Seat.findOne({
-      where: {
-        id:seatId,
-        screenId: show.screenId,
+  try {
+    const booking = await sequelize.transaction(async (transaction) => {
+      const show = await Show.findByPk(showId, { transaction });
+      if (!show) {
+        const error = new Error('Show not found');
+        error.status = 404;
+        throw error;
       }
+
+      // Lock the seat row so two requests cannot reserve it at the same time.
+      const seat = await Seat.findOne({
+        where: { id: seatId, screenId: show.screenId },
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+
+      if (!seat) {
+        const error = new Error('Seat not found for this show');
+        error.status = 404;
+        throw error;
+      }
+
+      const existingBooking = await Booking.findOne({
+        where: { showId, seatId },
+        transaction
+      });
+
+      if (existingBooking) {
+        const error = new Error('Seat is already booked for this show');
+        error.status = 409;
+        throw error;
+      }
+
+      return Booking.create({ showId, seatId, userId }, { transaction });
     });
-  
-    if (seat.available) {
-      // reserve the seat
-      seat.available = false;
-      seat.userId=userId;
-      await seat.save();
-  
-      // create a new booking
-      const booking = await Booking.create({
-        showId: showId,
-        seatId: seatId,
-        userId: userId
-      });
-  
-      res.status(200).json({
-        message: 'Seat reserved successfully',
-        bookingId: booking.id
-      });
-    } else {
-      // suggest next available seats
-      const nextavailableSeats = await Seat.findAll({
-        where: {
-          showId: showId,
-          screenId: screenId,
-          isavailable: true
-        }
-      });
-  
-      res.status(400).json({
-        message: 'Seat is not available',
-        nextavailableSeats: nextavailableSeats
-      });
-    }
-  });
-  
-  const GetAllBookings = async (req, res) => {
-    try {
-      const bookings = await Booking.findAll();
-      res.status(200).json({
-       bookings
-      });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ message: 'Server error' });
-    }
-  };
 
-  const CancelSeatBooking = async (req, res) => {
-    const { BookingId } = req.params;
-    try {
-      const booking = await Booking.findByPk(BookingId);
+    res.status(201).json({
+      message: 'Seat reserved successfully',
+      bookingId: booking.id
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const GetAllBookings = async (req, res, next) => {
+  try {
+    const bookings = await Booking.findAll();
+    res.status(200).json({ bookings });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const CancelSeatBooking = async (req, res, next) => {
+  const { BookingId } = req.params;
+
+  try {
+    await sequelize.transaction(async (transaction) => {
+      const booking = await Booking.findByPk(BookingId, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+
       if (!booking) {
-        return res.status(404).json({ message: 'booking not found' });
+        const error = new Error('Booking not found');
+        error.status = 404;
+        throw error;
       }
-     const seat = await Seat.findOne({
-        where:{
-            id:booking.seatId
-        }
-     })
-      seat.available = true;
-      seat.userId=null;
-      await seat.save();
- 
-      // delete booking from the database
-      booking.destroy({where:{id:BookingId}})
 
-      res.json({ message: 'Seat booking cancelled successfully' });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ message: 'Server error' });
-    }
-  };
-  
+      await booking.destroy({ transaction });
+    });
 
+    res.status(200).json({ message: 'Seat booking cancelled successfully' });
+  } catch (err) {
+    next(err);
+  }
+};
 
-
-  module.exports= {CreateBooking,GetAllBookings,CancelSeatBooking}
+module.exports = { CreateBooking, GetAllBookings, CancelSeatBooking };

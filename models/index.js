@@ -5,24 +5,33 @@ const Seat = require('./seat');
 const Booking = require('./booking');
 const User = require('./user');
 
-// Define associations between models here
-// ...
+Screen.hasMany(Seat, { foreignKey: 'screenId' });
+Seat.belongsTo(Screen, { foreignKey: 'screenId' });
 
-// Synchronize the database with the models
+Screen.hasMany(Show, { foreignKey: 'screenId' });
+Show.belongsTo(Screen, { foreignKey: 'screenId' });
 
-sequelize.sync({ alter: true })
-  .then(() => {
-    console.log('Database and tables created!');
-  })
-  .catch((err) => {
-    console.error('Error synchronizing the database:', err);
-  });
+User.hasMany(Booking, { foreignKey: 'userId' });
+Booking.belongsTo(User, { foreignKey: 'userId' });
 
+Show.hasMany(Booking, { foreignKey: 'showId' });
+Booking.belongsTo(Show, { foreignKey: 'showId' });
+
+Seat.hasMany(Booking, { foreignKey: 'seatId' });
+Booking.belongsTo(Seat, { foreignKey: 'seatId' });
+
+async function initializeDatabase() {
+  await sequelize.authenticate();
+  await sequelize.sync();
+  console.log('Database connected successfully');
+}
 
 module.exports = {
+  sequelize,
   Show,
   Screen,
   Seat,
   Booking,
-  User
+  User,
+  initializeDatabase
 };
