@@ -8,9 +8,7 @@ const Waitlist = sequelize.define('Waitlist', {
   promotedBookingId: { type: DataTypes.INTEGER, allowNull: true }
 }, {
   tableName: 'waitlist',
-  indexes: [
-    { fields: ['showId', 'status', 'createdAt'] },
-    { unique: true, fields: ['showId', 'userId', 'status'] }
-  ]
+  indexes: [{ fields: ['showId', 'status', 'createdAt'] }]
 });
+
 module.exports = Waitlist;
