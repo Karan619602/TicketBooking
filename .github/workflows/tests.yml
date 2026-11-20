@@ -2,35 +2,16 @@ name: tests
 
 on:
   push:
-    branches: [master, feature/complete-booking-api]
+    branches: [master, feature/production-backend-workflows-v2]
   pull_request:
     branches: [master]
 
+permissions:
+  contents: read
+
 jobs:
-  test:
+  sqlite:
     runs-on: ubuntu-latest
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: ticketbooking_test
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
-    env:
-      DB_DIALECT: mysql
-      database_name: ticketbooking_test
-      user_name: root
-      password: root
-      host: 127.0.0.1
-      PORT: 3000
-      NODE_ENV: test
-      RUN_DB_TESTS: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,7 +19,40 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - name: Run SQLite functional tests
-        run: npm test
-      - name: Run MySQL concurrency tests
-        run: npm run test:mysql
+      - name: Run SQLite functional and workflow tests
+        run: npm run test:local
+
+  postgres-16:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: ticketbooking
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ticketbooking"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DB_DIALECT: postgres
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_NAME: ticketbooking
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      NODE_ENV: test
+      AUTH_TOKEN_SECRET: ci-test-secret-with-at-least-32-characters
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Run PostgreSQL 16 functional and concurrency tests
+        run: npm run test:postgres
