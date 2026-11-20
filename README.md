@@ -74,3 +74,7 @@ The migration adds targeted indexes for hold expiry, FIFO waitlist retrieval, pa
 - `SEAT_HOLD_MINUTES`: temporary hold duration (1–15 minutes; default 5).
 - `PAYMENT_SIMULATOR_OUTCOME`: `success` or `decline` for local testing.
 - `DB_LOGGING`: set to `false` to suppress SQL logs in development.
+
+### Authentication and legacy routes
+
+The modern `/api/v1/bookings` create/list/cancel endpoints require a Bearer token. Customer booking lists are automatically scoped to the authenticated user. Configure `ADMIN_EMAILS` as a comma-separated allowlist before registration to provision trusted administrator accounts; do not expose this configuration to untrusted users. Legacy `/api/v1/booking/*` routes remain for backward compatibility and accept caller-supplied user IDs; disable them at the reverse proxy or remove them before exposing the service publicly.
