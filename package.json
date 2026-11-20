@@ -9,7 +9,7 @@
     "test": "npm run test:local",
     "test:local": "node scripts/run-tests.js sqlite",
     "test:postgres": "node scripts/run-tests.js postgres",
-    "test:postgres:concurrency": "node --test test/postgres.concurrency.test.js",
+    "test:postgres:concurrency": "node --test test/postgres.concurrency.test.js test/postgres.checkout.concurrency.test.js",
     "db:expire-holds": "node scripts/expire-holds.js"
   },
   "engines": { "node": ">=18" },
