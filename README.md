@@ -14,7 +14,7 @@ npm start
 ```
 
 ### PostgreSQL 16
-Create a database named `ticketbooking`, then set:
+Start the included PostgreSQL 16 service with `docker compose up -d postgres` (or install PostgreSQL 16 locally), then set:
 
 ```env
 DB_DIALECT=postgres
@@ -22,7 +22,7 @@ DB_HOST=127.0.0.1
 DB_PORT=5432
 DB_NAME=ticketbooking
 DB_USER=postgres
-DB_PASSWORD=your_password
+DB_PASSWORD=postgres # docker-compose default; change for local installations
 ```
 
 Install PostgreSQL 16 and ensure the server is running before executing:
