@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "node --test"
+    "test": "node --test test/booking.integration.test.js",
+    "test:mysql": "node --test test/booking.mysql.integration.js"
   },
   "engines": {
     "node": ">=18"

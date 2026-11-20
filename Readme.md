@@ -1,35 +1,39 @@
 # Online Movie Ticket Booking API
 
-A REST API for managing users, cinema screens, shows, seats and bookings. It uses Node.js, Express, Sequelize and MySQL.
+A REST API for managing users, cinema screens, shows, seats and bookings. It uses Node.js, Express and Sequelize, with SQLite for zero-setup local development and MySQL support for deployments and database-specific concurrency testing.
 
 ## Requirements
 
 - Node.js 18 or later
-- MySQL 8 or a compatible MySQL server
+- npm
+
+A local MySQL server is not required for the default setup.
 
 ## Run locally
 
 1. Install packages:
 
    ```bash
-   npm install
+   npm ci
    ```
 
-2. Create a MySQL database named `ticketbooking` (or choose another name).
+2. Copy `.env.example` to `.env` if you want to customise the defaults.
 
-3. Copy `.env.example` to `.env` and set the database credentials.
-
-4. Start the server:
+3. Start the server:
 
    ```bash
-   npm run dev
+   npm start
    ```
 
-The API listens on port 3000 by default. `GET /health` returns the service health.
+By default, the API uses SQLite and creates `data/ticketbooking.sqlite` automatically. The API listens on port 3000 by default. `GET /health` returns the service health.
+
+### Using MySQL
+
+MySQL remains supported. Set `DB_DIALECT=mysql` and configure `database_name`, `user_name`, `password`, `host` and `DB_PORT` in the environment. Create the database before starting the API.
 
 ### Existing database
 
-Back up your database first. If you are upgrading a database created by the original version, run `migrations/001-booking-reliability.sql` once before starting the updated API. The script adds the new booking and seat fields and indexes while retaining the existing booking rows. Do not run it on a fresh database. Check for duplicate seat numbers within a screen before creating the new unique index.
+Back up your database first. If you are upgrading a database created by the original MySQL version, run `migrations/001-booking-reliability.sql` once before starting the updated API. The script adds the new booking and seat fields and indexes while retaining the existing booking rows. Do not run it on a fresh database. Check for duplicate seat numbers within a screen before creating the new unique index.
 
 ## API
 
@@ -75,7 +79,7 @@ A repeated request with the same key and same booking details returns the origin
 
 A booking is tied to a show and a seat. A seat can be booked for different shows, but it can have only one confirmed booking for a given show.
 
-The booking service locks the show row inside a MySQL transaction before checking availability and creating the booking. This serializes booking attempts for the same show across multiple API processes. The seat row is also locked while the booking is checked.
+The booking service locks the show row inside a MySQL transaction before checking availability and creating the booking. This serializes booking attempts for the same show across multiple API processes. The seat row is also locked while the booking is checked. SQLite does not provide equivalent row-level `SELECT ... FOR UPDATE` semantics; the SQLite functional suite therefore verifies booking workflows, not concurrent booking safety. Run the MySQL concurrency test to validate that guarantee.
 
 The database has indexes for show/seat/status lookups, user booking history and show scheduling. A unique idempotency-key index protects retry handling at the database level.
 
@@ -89,15 +93,27 @@ A screen cannot have overlapping shows. Show creation locks the screen row while
 
 ## Tests
 
-Run the test suite:
+Run the default functional tests using an in-memory SQLite database:
 
 ```bash
 npm test
 ```
 
-The MySQL integration test is opt-in locally. Use a dedicated test database, configure the database variables in `.env`, set `RUN_DB_TESTS=true`, and run `npm test`. The test creates and removes its own records; do not point it at production data.
+These tests do not require a local MySQL server and are not skipped.
 
-GitHub Actions starts a MySQL 8 service and runs the integration test on pushes and pull requests. It covers simultaneous booking attempts, idempotent retries, reusing a seat for another show, cancellation and booking the released seat again.
+Run the MySQL-specific concurrency test only against a dedicated test database:
+
+```bash
+DB_DIALECT=mysql RUN_DB_TESTS=true npm run test:mysql
+```
+
+On Windows Command Prompt:
+
+```cmd
+set DB_DIALECT=mysql&& set RUN_DB_TESTS=true&& npm run test:mysql
+```
+
+Do not run integration tests against production data. GitHub Actions runs both the SQLite functional test and the MySQL concurrency test using a MySQL 8 service.
 
 ## Current scope
 
