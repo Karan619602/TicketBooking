@@ -2,11 +2,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 require('dotenv').config();
 
-const shouldRun = process.env.RUN_DB_TESTS === 'true';
+// The default functional suite must run without a local MySQL server.
+process.env.DB_DIALECT = 'sqlite';
+process.env.DB_STORAGE = ':memory:';
 
-test('booking flow handles contention, retries, availability and cancellation', {
-  skip: !shouldRun && 'Set RUN_DB_TESTS=true and configure a dedicated test database to run integration tests'
-}, async () => {
+test('SQLite booking flow supports retries, availability and cancellation', async () => {
   const { initializeDatabase, sequelize, User, Screen, Show, Seat, Booking } = require('../models');
   const bookingService = require('../services/bookingservice');
 
@@ -20,19 +20,19 @@ test('booking flow handles contention, retries, availability and cancellation', 
     await initializeDatabase();
 
     user = await User.create({
-      name: 'Booking Test User',
-      email: 'booking-test-' + Date.now() + '@example.test'
+      name: 'SQLite Booking Test User',
+      email: 'sqlite-booking-test-' + Date.now() + '@example.test'
     });
-    screen = await Screen.create({ name: 'Integration Test Screen', capacity: 5 });
+    screen = await Screen.create({ name: 'SQLite Test Screen', capacity: 5 });
     const now = Date.now();
     firstShow = await Show.create({
-      name: 'Concurrency Test',
+      name: 'SQLite Functional Test',
       screenId: screen.id,
       startTime: new Date(now + 60 * 60 * 1000),
       endTime: new Date(now + 3 * 60 * 60 * 1000)
     });
     secondShow = await Show.create({
-      name: 'Second Show',
+      name: 'SQLite Second Show',
       screenId: screen.id,
       startTime: new Date(now + 4 * 60 * 60 * 1000),
       endTime: new Date(now + 6 * 60 * 60 * 1000)
@@ -44,33 +44,38 @@ test('booking flow handles contention, retries, availability and cancellation', 
       price: 180
     });
 
-    const attempts = await Promise.allSettled([
-      bookingService.createBooking({
-        userId: user.id, showId: firstShow.id, seatId: seat.id, idempotencyKey: 'parallel-request-a'
-      }),
-      bookingService.createBooking({
-        userId: user.id, showId: firstShow.id, seatId: seat.id, idempotencyKey: 'parallel-request-b'
-      })
-    ]);
-    assert.equal(attempts.filter((result) => result.status === 'fulfilled').length, 1);
-    assert.equal(attempts.filter((result) => result.status === 'rejected').length, 1);
+    const firstResult = await bookingService.createBooking({
+      userId: user.id,
+      showId: firstShow.id,
+      seatId: seat.id,
+      idempotencyKey: 'sqlite-functional-booking'
+    });
+    assert.equal(firstResult.replayed, false);
+    const firstBooking = firstResult.booking;
 
-    const firstBooking = attempts.find((result) => result.status === 'fulfilled').value.booking;
     const retry = await bookingService.createBooking({
-      userId: user.id, showId: firstShow.id, seatId: seat.id,
-      idempotencyKey: firstBooking.idempotencyKey.split(':').slice(1).join(':')
+      userId: user.id,
+      showId: firstShow.id,
+      seatId: seat.id,
+      idempotencyKey: 'sqlite-functional-booking'
     });
     assert.equal(retry.booking.id, firstBooking.id);
     assert.equal(retry.replayed, true);
 
     const otherShowBooking = await bookingService.createBooking({
-      userId: user.id, showId: secondShow.id, seatId: seat.id, idempotencyKey: 'same-seat-other-show'
+      userId: user.id,
+      showId: secondShow.id,
+      seatId: seat.id,
+      idempotencyKey: 'sqlite-same-seat-other-show'
     });
     assert.notEqual(otherShowBooking.booking.id, firstBooking.id);
 
     await bookingService.cancelBooking({ bookingId: firstBooking.id, userId: user.id });
     const replacement = await bookingService.createBooking({
-      userId: user.id, showId: firstShow.id, seatId: seat.id, idempotencyKey: 'replacement-after-cancel'
+      userId: user.id,
+      showId: firstShow.id,
+      seatId: seat.id,
+      idempotencyKey: 'sqlite-replacement-after-cancel'
     });
     assert.equal(replacement.booking.status, 'confirmed');
 

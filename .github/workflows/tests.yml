@@ -23,6 +23,7 @@ jobs:
           --health-timeout=5s
           --health-retries=10
     env:
+      DB_DIALECT: mysql
       database_name: ticketbooking_test
       user_name: root
       password: root
@@ -37,4 +38,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm test
+      - name: Run SQLite functional tests
+        run: npm test
+      - name: Run MySQL concurrency tests
+        run: npm run test:mysql
