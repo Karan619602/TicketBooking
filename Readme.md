@@ -1,61 +1,102 @@
-# Online Movie Ticket Booking System Backend
+# Online Movie Ticket Booking API
 
-A REST API built with Node.js, Express, Sequelize and MySQL.
+A REST API for managing users, cinema screens, shows, seats and bookings. It uses Node.js, Express, Sequelize and MySQL.
 
 ## Requirements
 
-- Node.js
-- MySQL
+- Node.js 18 or later
+- MySQL 8 or a compatible MySQL server
 
-## Setup
+## Run locally
 
-1. Clone the repository and install dependencies:
+1. Install packages:
 
    ```bash
-   git clone https://github.com/Karan619602/TicketBooking.git
-   cd TicketBooking
    npm install
    ```
 
-2. Create a `.env` file in the project root:
+2. Create a MySQL database named `ticketbooking` (or choose another name).
 
-   ```env
-   database_name=ticketbooking
-   user_name=root
-   password=your_mysql_password
-   host=localhost
-   PORT=3000
-   ```
+3. Copy `.env.example` to `.env` and set the database credentials.
 
-3. Create the database in MySQL and start the server:
+4. Start the server:
 
    ```bash
-   npm start
+   npm run dev
    ```
 
-The API runs on port 3000 by default. Use `GET /health` to check that it is running.
+The API listens on port 3000 by default. `GET /health` returns the service health.
 
-## API Endpoints
+## API
+
+All endpoints are prefixed with `/api/v1`.
 
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/api/v1/user/create` | Create a user |
-| POST | `/api/v1/screen/create` | Create a screen |
-| GET | `/api/v1/screen/get` | Get all screens |
-| POST | `/api/v1/show/create/:screenId` | Create a show |
-| GET | `/api/v1/screen/get` | Get all shows (original route) |
-| GET | `/api/v1/screen/get/:id` | Get a show by ID (original route) |
-| GET | `/api/v1/seat/available/:showId` | Get seats available for a show |
-| POST | `/api/v1/booking/create/:userId/:showId/:seatId` | Book a seat |
-| GET | `/api/v1/bookings` | Get all bookings |
-| POST | `/api/v1/booking/cancel/:BookingId` | Cancel a booking |
+| POST | `/user/create` | Create a user |
+| POST | `/screen/create` | Create a screen |
+| GET | `/screen/get` | List screens |
+| POST | `/screens/:screenId/seats` | Add seats to a screen |
+| POST | `/show/create/:screenId` | Schedule a show |
+| GET | `/shows` | List shows; accepts `screenId`, `from` and `to` filters |
+| GET | `/shows/:showId` | Get show details |
+| GET | `/seat/available/:showId` | Get seat availability for a show |
+| POST | `/bookings` | Create a booking |
+| GET | `/bookings` | List bookings with pagination and optional status |
+| POST | `/bookings/:bookingId/cancel` | Cancel a booking |
 
-## Booking behaviour
+The original booking and show routes are still available for existing clients.
 
-A seat belongs to a screen, while a booking belongs to a particular show. Availability is therefore calculated for each show using its existing bookings. A seat booked for one show remains available for another show on the same screen.
+### Create a booking
 
-Booking and cancellation run inside database transactions. Booking locks the seat row while checking for an existing booking, preventing two concurrent requests from reserving the same seat.
+Send `POST /api/v1/bookings` with:
 
-## Notes
+```json
+{
+  "userId": 12,
+  "showId": 34,
+  "seatId": 56
+}
+```
 
-The original API routes are retained to avoid breaking existing clients. This version does not yet include user authentication; the `userId` in the booking route is accepted as supplied by the caller and should not be treated as a verified identity in a public deployment.
+Include an `Idempotency-Key` header for safe retries:
+
+```
+Idempotency-Key: checkout-7f82d1
+```
+
+A repeated request with the same key and same booking details returns the original booking. Reusing that key for different details returns `409 Conflict`.
+
+### Booking concurrency
+
+A booking is tied to a show and a seat. A seat can be booked for different shows, but it can have only one confirmed booking for a given show.
+
+The booking service locks the show row inside a MySQL transaction before checking availability and creating the booking. This serializes booking attempts for the same show across multiple API processes. The seat row is also locked while the booking is checked.
+
+The database has indexes for show/seat/status lookups, user booking history and show scheduling. A unique idempotency-key index protects retry handling at the database level.
+
+### Cancellation and history
+
+Cancellation changes the booking status to `cancelled` instead of deleting the row. This preserves booking history and makes the seat available again. A cancelled booking can be replaced with a new booking using a new idempotency key.
+
+### Scheduling
+
+A screen cannot have overlapping shows. Show creation locks the screen row while checking for an overlap and inserting the new show.
+
+## Tests
+
+Run the regular test suite:
+
+```bash
+npm test
+```
+
+The MySQL integration test is opt-in. Use a dedicated test database, configure the same database variables in `.env`, set `RUN_DB_TESTS=true`, and run `npm test`. The test creates and removes its own records; do not point it at production data.
+
+The integration test covers simultaneous booking attempts, idempotent retries, reusing a seat for a different show, cancellation, and booking the released seat again.
+
+## Current scope
+
+Payment gateway integration is intentionally not included yet. Booking and cancellation are implemented independently so payment can be added later without mixing gateway calls into the seat-allocation transaction.
+
+Authentication and authorization also need to be added before exposing user-specific booking operations or the booking-list endpoint to the public internet. The current API accepts `userId` from the request for compatibility with the original project; it is not a verified identity.

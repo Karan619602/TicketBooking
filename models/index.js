@@ -1,14 +1,14 @@
 const sequelize = require('./database');
-const Show = require('./shows');
+const User = require('./user');
 const Screen = require('./screens');
+const Show = require('./shows');
 const Seat = require('./seat');
 const Booking = require('./booking');
-const User = require('./user');
 
-Screen.hasMany(Seat, { foreignKey: 'screenId' });
+Screen.hasMany(Seat, { foreignKey: 'screenId', onDelete: 'CASCADE' });
 Seat.belongsTo(Screen, { foreignKey: 'screenId' });
 
-Screen.hasMany(Show, { foreignKey: 'screenId' });
+Screen.hasMany(Show, { foreignKey: 'screenId', onDelete: 'CASCADE' });
 Show.belongsTo(Screen, { foreignKey: 'screenId' });
 
 User.hasMany(Booking, { foreignKey: 'userId' });
@@ -28,10 +28,10 @@ async function initializeDatabase() {
 
 module.exports = {
   sequelize,
-  Show,
+  User,
   Screen,
+  Show,
   Seat,
   Booking,
-  User,
   initializeDatabase
 };

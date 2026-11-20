@@ -1,9 +1,9 @@
-const express=require('express')
+const express = require('express');
+const router = express.Router();
+const { CreateScreen, GetScreens, CreateSeats } = require('../controllers/screencontroller');
 
-const router= express.Router()
+router.post('/screen/create', CreateScreen);
+router.get('/screen/get', GetScreens);
+router.post('/screens/:screenId/seats', CreateSeats);
 
-const {CreateScreen,GetScreens} = require('../controllers/screencontroller')
-
-router.post('/screen/create',CreateScreen)
-router.get('/screen/get',GetScreens)
-module.exports= router
+module.exports = router;

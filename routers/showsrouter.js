@@ -1,10 +1,13 @@
-const express=require('express')
+const express = require('express');
+const router = express.Router();
+const { CreateShow, GetAllShows, GetShowById } = require('../controllers/showcontroller');
 
-const router= express.Router()
+router.post('/show/create/:screenId', CreateShow);
+router.get('/shows', GetAllShows);
+router.get('/shows/:showId', GetShowById);
 
-const {CreateShow,GetAllShows,GetShowById} = require('../controllers/showcontroller')
+// Original routes retained for backwards compatibility.
+router.get('/screen/get', GetAllShows);
+router.get('/screen/get/:id', GetShowById);
 
-router.post('/show/create/:screenId',CreateShow)
-router.get('/screen/get',GetAllShows)
-router.get('/screen/get/:id',GetShowById)
-module.exports= router
+module.exports = router;

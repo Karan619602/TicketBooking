@@ -1,11 +1,12 @@
 const express = require('express');
 const dotenv = require('dotenv');
 
-dotenv.config({ path: '.env' });
+dotenv.config();
 
 const app = express();
+app.disable('x-powered-by');
 app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
 const { initializeDatabase } = require('./models');
 
@@ -25,11 +26,30 @@ app.use('/api/v1', showsrouter);
 app.use('/api/v1', seatrouter);
 app.use('/api/v1', bookingrouter);
 
+app.use((req, res) => {
+  res.status(404).json({ message: 'Route not found' });
+});
+
 app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(err.status || 500).json({
-    message: err.status ? err.message : 'Something went wrong'
-  });
+  if (res.headersSent) return next(err);
+
+  let status = err.status || 500;
+  let message = err.message || 'Something went wrong';
+
+  if (err.name === 'SequelizeValidationError' || err.name === 'SequelizeUniqueConstraintError') {
+    status = 400;
+    message = err.errors ? err.errors.map((item) => item.message).join(', ') : message;
+  } else if (err.name === 'SequelizeForeignKeyConstraintError') {
+    status = 400;
+    message = 'A referenced record does not exist or is still in use';
+  }
+
+  if (status >= 500) {
+    console.error(err);
+    message = process.env.NODE_ENV === 'production' ? 'Internal server error' : message;
+  }
+
+  res.status(status).json({ message });
 });
 
 const PORT = process.env.PORT || 3000;

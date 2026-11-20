@@ -1,27 +1,36 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('./database');
-const Screen = require('./screens');
 
 const Show = sequelize.define('Show', {
   name: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING(150),
     allowNull: false,
-  }, 
+    validate: { notEmpty: true, len: [1, 150] }
+  },
   startTime: {
     type: DataTypes.DATE,
-    allowNull: false,
+    allowNull: false
   },
   endTime: {
     type: DataTypes.DATE,
-    allowNull: false,
+    allowNull: false
   },
   screenId: {
     type: DataTypes.INTEGER,
-    references: {
-      model: Screen,
-      key: 'id'
+    allowNull: false
+  }
+}, {
+  validate: {
+    validShowTime() {
+      if (this.startTime && this.endTime && new Date(this.endTime) <= new Date(this.startTime)) {
+        throw new Error('Show end time must be after start time');
+      }
     }
-}
+  },
+  indexes: [
+    { fields: ['screenId', 'startTime'] },
+    { fields: ['startTime'] }
+  ]
 });
 
 module.exports = Show;
