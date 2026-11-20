@@ -23,7 +23,9 @@ async function register({ name, email, password }) {
   const passwordHash = await hashPassword(password, salt);
   const result = await sequelize.transaction(async (transaction) => {
     const user = await User.create({ name: name.trim(), email: email.trim().toLowerCase() }, { transaction });
-    const credential = await Credential.create({ userId: user.id, passwordHash, passwordSalt: salt }, { transaction });
+    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
+    const role = adminEmails.includes(user.email) ? 'admin' : 'customer';
+    const credential = await Credential.create({ userId: user.id, passwordHash, passwordSalt: salt, role }, { transaction });
     return { user, credential };
   });
   return { user: publicUser(result.user, result.credential), accessToken: signToken({ sub: result.user.id, role: result.credential.role }) };
