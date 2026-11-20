@@ -1,4 +1,5 @@
-const { sequelize, User, Show, Seat, Booking, Waitlist } = require('../models');
+const { Op } = require('sequelize');
+const { sequelize, User, Show, Seat, Booking, Waitlist, SeatHold } = require('../models');
 const HttpError = require('../utils/httpError');
 
 async function joinWaitlist({ userId, showId }) {
@@ -12,7 +13,8 @@ async function joinWaitlist({ userId, showId }) {
     if (existing) return { entry: existing, created: false };
     const seatCount = await Seat.count({ where: { screenId: show.screenId }, transaction });
     const bookedCount = await Booking.count({ where: { showId, status: 'confirmed' }, transaction });
-    if (seatCount === 0 || bookedCount < seatCount) throw new HttpError(409, 'This show still has available seats; book directly instead');
+    const activeHoldCount = await SeatHold.count({ where: { showId, status: 'active', expiresAt: { [Op.gt]: new Date() } }, transaction });
+    if (seatCount === 0 || bookedCount + activeHoldCount < seatCount) throw new HttpError(409, 'This show still has available seats; book directly instead');
     const alreadyBooked = await Booking.findOne({ where: { userId, showId, status: 'confirmed' }, transaction });
     if (alreadyBooked) throw new HttpError(409, 'You already have a confirmed booking for this show');
     const entry = await Waitlist.create({ userId, showId, status: 'waiting' }, { transaction });
