@@ -24,7 +24,7 @@ if (!suites[dialect]) {
   process.exit(2);
 }
 
-const result = spawnSync(process.execPath, ['--test', ...suites[dialect]], {
+const result = spawnSync(process.execPath, ['--test', '--test-concurrency=1', ...suites[dialect]], {
   stdio: 'inherit',
   env: { ...process.env, DB_DIALECT: dialect === 'postgresql' ? 'postgres' : dialect }
 });
