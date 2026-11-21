@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 require("dotenv").config();
 
-test("SQLite booking flow supports retries, availability and cancellation", async () => {
+test("PostgreSQL booking flow supports retries, availability and cancellation", async () => {
   const {
     initializeDatabase,
     sequelize,
@@ -24,19 +24,19 @@ test("SQLite booking flow supports retries, availability and cancellation", asyn
     await initializeDatabase();
 
     user = await User.create({
-      name: "SQLite Booking Test User",
-      email: "sqlite-booking-test-" + Date.now() + "@example.test",
+      name: "PostgreSQL Booking Test User",
+      email: "postgres-booking-test-" + Date.now() + "@example.test",
     });
-    screen = await Screen.create({ name: "SQLite Test Screen", capacity: 5 });
+    screen = await Screen.create({ name: "PostgreSQL Test Screen", capacity: 5 });
     const now = Date.now();
     firstShow = await Show.create({
-      name: "SQLite Functional Test",
+      name: "PostgreSQL Functional Test",
       screenId: screen.id,
       startTime: new Date(now + 60 * 60 * 1000),
       endTime: new Date(now + 3 * 60 * 60 * 1000),
     });
     secondShow = await Show.create({
-      name: "SQLite Second Show",
+      name: "PostgreSQL Second Show",
       screenId: screen.id,
       startTime: new Date(now + 4 * 60 * 60 * 1000),
       endTime: new Date(now + 6 * 60 * 60 * 1000),
@@ -48,11 +48,12 @@ test("SQLite booking flow supports retries, availability and cancellation", asyn
       price: 180,
     });
 
+    const bookingIdempotencyKey = "postgres-functional-booking-" + Date.now();
     const firstResult = await bookingService.createBooking({
       userId: user.id,
       showId: firstShow.id,
       seatId: seat.id,
-      idempotencyKey: "sqlite-functional-booking",
+      idempotencyKey: bookingIdempotencyKey,
     });
     assert.equal(firstResult.replayed, false);
     const firstBooking = firstResult.booking;
@@ -61,7 +62,7 @@ test("SQLite booking flow supports retries, availability and cancellation", asyn
       userId: user.id,
       showId: firstShow.id,
       seatId: seat.id,
-      idempotencyKey: "sqlite-functional-booking",
+      idempotencyKey: bookingIdempotencyKey,
     });
     assert.equal(retry.booking.id, firstBooking.id);
     assert.equal(retry.replayed, true);
@@ -70,7 +71,7 @@ test("SQLite booking flow supports retries, availability and cancellation", asyn
       userId: user.id,
       showId: secondShow.id,
       seatId: seat.id,
-      idempotencyKey: "sqlite-same-seat-other-show",
+      idempotencyKey: "postgres-same-seat-other-show-" + Date.now(),
     });
     assert.notEqual(otherShowBooking.booking.id, firstBooking.id);
 
@@ -82,7 +83,7 @@ test("SQLite booking flow supports retries, availability and cancellation", asyn
       userId: user.id,
       showId: firstShow.id,
       seatId: seat.id,
-      idempotencyKey: "sqlite-replacement-after-cancel",
+      idempotencyKey: "postgres-replacement-after-cancel-" + Date.now(),
     });
     assert.equal(replacement.booking.status, "confirmed");
 

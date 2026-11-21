@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "npm run test:local",
+    "test": "npm run test:postgres",
     "test:local": "node scripts/run-tests.js postgres",
     "test:postgres": "node scripts/run-tests.js postgres",
     "test:postgres:concurrency": "node --test test/postgres.concurrency.test.js test/postgres.checkout.concurrency.test.js",
@@ -23,8 +23,7 @@
     "mysql2": "^3.2.0",
     "nodemon": "^2.0.21",
     "pg": "^8.13.1",
-    "sequelize": "^6.29.0",
-    "sqlite3": "^5.1.7"
+    "sequelize": "^6.29.0"
   },
   "overrides": {
     "node-abi": "3.87.0",

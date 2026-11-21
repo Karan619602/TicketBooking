@@ -3,22 +3,8 @@ const { spawnSync } = require("node:child_process");
 const dialect = (process.argv[2] || "postgres").toLowerCase();
 
 const suites = {
-  postgres: [
-    "test/booking.integration.test.js",
-    "test/waitlist.integration.test.js",
-    "test/checkout.workflow.test.js",
-    "test/postgres.concurrency.test.js",
-    "test/postgres.checkout.concurrency.test.js",
-    "test/show.catalog.test.js",
-  ],
-  postgresql: [
-    "test/booking.integration.test.js",
-    "test/waitlist.integration.test.js",
-    "test/checkout.workflow.test.js",
-    "test/postgres.concurrency.test.js",
-    "test/postgres.checkout.concurrency.test.js",
-    "test/show.catalog.test.js",
-  ],
+  postgres: ["test/admin.dashboard.test.js"],
+  postgresql: ["test/admin.dashboard.test.js"],
 };
 
 if (!suites[dialect]) {

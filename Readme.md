@@ -1,20 +1,20 @@
 # Movie Ticket Booking Backend
 
-A Node.js, Express and Sequelize API for movie-ticket booking, with SQLite for local development and PostgreSQL 16 for production-style integration and concurrency testing.
+A Node.js, Express and Sequelize API for movie-ticket booking, using PostgreSQL 16 for local development and production-style integration and concurrency testing.
 
 ## Database setup
 
-### Local SQLite (default)
-Copy `.env.example` to `.env`. The default SQLite database is created automatically.
+### PostgreSQL 16 (default)
+Copy `.env.example` to `.env` and start the included PostgreSQL 16 service:
 
 ```bash
+docker compose up -d postgres
 npm ci
-npm test
+npm run test:postgres
 npm start
 ```
 
-### PostgreSQL 16
-Start the included PostgreSQL 16 service with `docker compose up -d postgres` (or install PostgreSQL 16 locally), then set:
+Or install PostgreSQL 16 locally and configure:
 
 ```env
 DB_DIALECT=postgres
@@ -23,14 +23,6 @@ DB_PORT=5432
 DB_NAME=ticketbooking
 DB_USER=postgres
 DB_PASSWORD=postgres # docker-compose default; change for local installations
-```
-
-Install PostgreSQL 16 and ensure the server is running before executing:
-
-```bash
-npm ci
-npm run test:postgres
-npm start
 ```
 
 The PostgreSQL concurrency test is `test/postgres.concurrency.test.js` and can be run alone with `npm run test:postgres:concurrency`. It verifies concurrent booking contention and FIFO waitlist promotion against PostgreSQL row locks.
@@ -78,6 +70,17 @@ The migration adds targeted indexes for hold expiry, FIFO waitlist retrieval, pa
 ### Authentication and legacy routes
 
 The modern `/api/v1/bookings` create/list/cancel endpoints require a Bearer token. Customer booking lists are automatically scoped to the authenticated user. Configure `ADMIN_EMAILS` as a comma-separated allowlist before registration to provision trusted administrator accounts; do not expose this configuration to untrusted users. Legacy `/api/v1/booking/*` routes remain for backward compatibility and accept caller-supplied user IDs; disable them at the reverse proxy or remove them before exposing the service publicly.
+
+## Admin dashboard API contract
+
+The admin dashboard endpoints require a Bearer token with the `admin` role:
+
+- `GET /api/v1/admin/dashboard` returns a `metrics` object with `totalUsers`, `totalShows`, `totalBookings`, `confirmedBookings`, `cancelledBookings`, and `totalRevenue`. Revenue is the sum of `totalAmount` for confirmed bookings only.
+- `GET /api/v1/admin/users?page=1&limit=20` returns `{ users, pagination }` without credential or password fields.
+- `GET /api/v1/admin/shows?page=1&limit=20` returns `{ shows, pagination }`.
+- `GET /api/v1/admin/bookings?page=1&limit=20&status=confirmed` returns `{ bookings, pagination }`, includes the associated `User`, `Show`, and `Seat`, and optionally filters by `confirmed` or `cancelled`. Other status values return HTTP 400.
+
+All paginated endpoints return `total`, `page`, `limit`, `totalPages`, `hasNextPage`, and `hasPreviousPage` in `pagination`. The admin endpoints return HTTP 401 without a valid access token and HTTP 403 to authenticated non-admin users. Only administrators may create screens with `POST /api/v1/screen/create` or shows with `POST /api/v1/show/create/:screenId`. `test/admin.dashboard.test.js` exercises this contract against PostgreSQL 16.
 
 ## Show catalog API
 
