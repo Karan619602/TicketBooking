@@ -10,7 +10,10 @@
     "test:local": "node scripts/run-tests.js postgres",
     "test:postgres": "node scripts/run-tests.js postgres",
     "test:postgres:concurrency": "node --test test/postgres.concurrency.test.js test/postgres.checkout.concurrency.test.js",
-    "db:expire-holds": "node scripts/expire-holds.js"
+    "db:expire-holds": "node scripts/expire-holds.js",
+    "test:exchange": "node --test --test-concurrency=1 test/exchange.quotes.test.js test/exchange.settlement.test.js test/exchange.concurrency.test.js",
+    "test:notifications": "node --test --test-concurrency=1 test/notifications.workflow.test.js",
+    "test:existing": "node --test --test-concurrency=1 test/booking.integration.test.js test/checkout.workflow.test.js test/waitlist.integration.test.js"
   },
   "engines": {
     "node": ">=18"
