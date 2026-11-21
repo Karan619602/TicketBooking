@@ -5,12 +5,14 @@ const suites = {
   sqlite: [
     'test/booking.integration.test.js',
     'test/waitlist.integration.test.js',
-    'test/checkout.workflow.test.js'
+    'test/checkout.workflow.test.js',
+    'test/show.catalog.test.js'
   ],
   postgres: [
     'test/waitlist.integration.test.js',
     'test/postgres.concurrency.test.js',
-    'test/postgres.checkout.concurrency.test.js'
+    'test/postgres.checkout.concurrency.test.js',
+    'test/show.catalog.test.js'
   ],
   postgresql: [
     'test/waitlist.integration.test.js',
