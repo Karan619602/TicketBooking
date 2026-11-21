@@ -1,14 +1,18 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-require('dotenv').config();
+const test = require("node:test");
+const assert = require("node:assert/strict");
+require("dotenv").config();
 
-// The default functional suite must run without a local MySQL server.
-process.env.DB_DIALECT = 'sqlite';
-process.env.DB_STORAGE = ':memory:';
-
-test('SQLite booking flow supports retries, availability and cancellation', async () => {
-  const { initializeDatabase, sequelize, User, Screen, Show, Seat, Booking } = require('../models');
-  const bookingService = require('../services/bookingservice');
+test("SQLite booking flow supports retries, availability and cancellation", async () => {
+  const {
+    initializeDatabase,
+    sequelize,
+    User,
+    Screen,
+    Show,
+    Seat,
+    Booking,
+  } = require("../models");
+  const bookingService = require("../services/bookingservice");
 
   let user;
   let screen;
@@ -20,35 +24,35 @@ test('SQLite booking flow supports retries, availability and cancellation', asyn
     await initializeDatabase();
 
     user = await User.create({
-      name: 'SQLite Booking Test User',
-      email: 'sqlite-booking-test-' + Date.now() + '@example.test'
+      name: "SQLite Booking Test User",
+      email: "sqlite-booking-test-" + Date.now() + "@example.test",
     });
-    screen = await Screen.create({ name: 'SQLite Test Screen', capacity: 5 });
+    screen = await Screen.create({ name: "SQLite Test Screen", capacity: 5 });
     const now = Date.now();
     firstShow = await Show.create({
-      name: 'SQLite Functional Test',
+      name: "SQLite Functional Test",
       screenId: screen.id,
       startTime: new Date(now + 60 * 60 * 1000),
-      endTime: new Date(now + 3 * 60 * 60 * 1000)
+      endTime: new Date(now + 3 * 60 * 60 * 1000),
     });
     secondShow = await Show.create({
-      name: 'SQLite Second Show',
+      name: "SQLite Second Show",
       screenId: screen.id,
       startTime: new Date(now + 4 * 60 * 60 * 1000),
-      endTime: new Date(now + 6 * 60 * 60 * 1000)
+      endTime: new Date(now + 6 * 60 * 60 * 1000),
     });
     seat = await Seat.create({
       number: 1,
       screenId: screen.id,
-      category: 'standard',
-      price: 180
+      category: "standard",
+      price: 180,
     });
 
     const firstResult = await bookingService.createBooking({
       userId: user.id,
       showId: firstShow.id,
       seatId: seat.id,
-      idempotencyKey: 'sqlite-functional-booking'
+      idempotencyKey: "sqlite-functional-booking",
     });
     assert.equal(firstResult.replayed, false);
     const firstBooking = firstResult.booking;
@@ -57,7 +61,7 @@ test('SQLite booking flow supports retries, availability and cancellation', asyn
       userId: user.id,
       showId: firstShow.id,
       seatId: seat.id,
-      idempotencyKey: 'sqlite-functional-booking'
+      idempotencyKey: "sqlite-functional-booking",
     });
     assert.equal(retry.booking.id, firstBooking.id);
     assert.equal(retry.replayed, true);
@@ -66,22 +70,34 @@ test('SQLite booking flow supports retries, availability and cancellation', asyn
       userId: user.id,
       showId: secondShow.id,
       seatId: seat.id,
-      idempotencyKey: 'sqlite-same-seat-other-show'
+      idempotencyKey: "sqlite-same-seat-other-show",
     });
     assert.notEqual(otherShowBooking.booking.id, firstBooking.id);
 
-    await bookingService.cancelBooking({ bookingId: firstBooking.id, userId: user.id });
+    await bookingService.cancelBooking({
+      bookingId: firstBooking.id,
+      userId: user.id,
+    });
     const replacement = await bookingService.createBooking({
       userId: user.id,
       showId: firstShow.id,
       seatId: seat.id,
-      idempotencyKey: 'sqlite-replacement-after-cancel'
+      idempotencyKey: "sqlite-replacement-after-cancel",
     });
-    assert.equal(replacement.booking.status, 'confirmed');
+    assert.equal(replacement.booking.status, "confirmed");
 
-    const history = await Booking.findAll({ where: { userId: user.id }, order: [['id', 'ASC']] });
-    assert.equal(history.filter((booking) => booking.status === 'cancelled').length, 1);
-    assert.equal(history.filter((booking) => booking.status === 'confirmed').length, 2);
+    const history = await Booking.findAll({
+      where: { userId: user.id },
+      order: [["id", "ASC"]],
+    });
+    assert.equal(
+      history.filter((booking) => booking.status === "cancelled").length,
+      1,
+    );
+    assert.equal(
+      history.filter((booking) => booking.status === "confirmed").length,
+      2,
+    );
   } finally {
     if (user) {
       await Booking.destroy({ where: { userId: user.id } });

@@ -1,5 +1,0 @@
-# Reviewer notes
-
-- Seat availability is assembled in `controllers/seatcontroller.js`. The controller lists seats for the selected show's screen and marks a seat unavailable when a confirmed booking exists for that show.
-- Cancelled bookings are excluded from the confirmed-booking query, so a cancelled seat becomes available again.
-- SQLite functional tests cover the booking lifecycle but do not validate MySQL row-level locking. Use the dedicated MySQL concurrency test for simultaneous booking attempts.

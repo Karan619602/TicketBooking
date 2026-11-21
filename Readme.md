@@ -78,3 +78,21 @@ The migration adds targeted indexes for hold expiry, FIFO waitlist retrieval, pa
 ### Authentication and legacy routes
 
 The modern `/api/v1/bookings` create/list/cancel endpoints require a Bearer token. Customer booking lists are automatically scoped to the authenticated user. Configure `ADMIN_EMAILS` as a comma-separated allowlist before registration to provision trusted administrator accounts; do not expose this configuration to untrusted users. Legacy `/api/v1/booking/*` routes remain for backward compatibility and accept caller-supplied user IDs; disable them at the reverse proxy or remove them before exposing the service publicly.
+
+## Show catalog API
+
+`GET /api/v1/shows` (and the legacy `GET /api/v1/screen/get`) supports pagination, case-insensitive name search, filtering and sorting.
+
+| Query parameter | Default | Description |
+| --- | --- | --- |
+| `page` | `1` | 1-based page number |
+| `limit` | `20` | Results per page (maximum `100`) |
+| `search` | — | Case-insensitive partial match against the show name (maximum 100 characters) |
+| `screenId` | — | Filter by a positive screen ID |
+| `from` / `to` | — | Inclusive ISO-compatible date bounds on `startTime` |
+| `sortBy` | `startTime` | `name`, `startTime`, or `createdAt` |
+| `sortOrder` | `asc` | `asc` or `desc` |
+
+Example: `GET /api/v1/shows?search=matrix&screenId=2&page=1&limit=10&sortBy=startTime&sortOrder=asc`.
+
+The response retains the `shows` array and adds `pagination` metadata: `total`, `page`, `limit`, `totalPages`, `hasNextPage`, and `hasPreviousPage`. Invalid query values return HTTP 400. Results use the show ID as a stable secondary sort key.
