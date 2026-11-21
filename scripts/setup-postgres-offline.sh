@@ -25,6 +25,7 @@ PG_DB="${PG_DB:-ticketbooking}"
 mkdir -p "$PG_DATA"
 chmod 700 "$PG_DATA"
 PG_LOG="$PG_DATA/server.log"
+PG_SOCKET_DIR="${PG_SOCKET_DIR:-$PG_DATA}"
 
 if [ ! -f "$PG_DATA/PG_VERSION" ]; then
   PASSFILE="$(mktemp)"
@@ -42,10 +43,12 @@ if [ "$(cat "$PG_DATA/PG_VERSION")" != "16" ]; then
 fi
 
 if ! "$PG_BIN/pg_ctl" -D "$PG_DATA" status >/dev/null 2>&1; then
-  "$PG_BIN/pg_ctl" -D "$PG_DATA" -l "$PG_LOG" -o "-h 127.0.0.1 -p $PG_PORT" -w start
+  "$PG_BIN/pg_ctl" -D "$PG_DATA" -l "$PG_LOG" -o "-h 127.0.0.1 -p $PG_PORT -k $PG_SOCKET_DIR" -w start
 fi
 
 export PGPASSWORD="$PG_PASSWORD"
+# Verify the TCP endpoint, not merely that a cluster is running.
+"$PG_BIN/psql" -h 127.0.0.1 -p "$PG_PORT" -U postgres -d postgres -Atqc "SHOW server_version" | grep -q "^16" || { echo "PostgreSQL 16 is not reachable at 127.0.0.1:$PG_PORT" >&2; exit 1; }
 if ! "$PG_BIN/psql" -h 127.0.0.1 -p "$PG_PORT" -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$PG_DB'" | grep -qx 1; then
   "$PG_BIN/createdb" -h 127.0.0.1 -p "$PG_PORT" -U postgres -O postgres "$PG_DB"
 fi
